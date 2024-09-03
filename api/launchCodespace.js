@@ -53,9 +53,12 @@ async function handleRequest(req, res) {
     const githubToken = process.env.GITHUB_TOKEN;
 
     if (!githubToken) {
-      throw new Error('GitHub access token is not set');
+      console.error('GitHub access token is not set');
+      res.status(500).send('GitHub access token is not set');
+      return;
     }
 
+    console.log('Fetching codespace...');
     const codespace = await getCodespace(githubToken);
 
     if (codespace) {
@@ -83,8 +86,9 @@ async function handleRequest(req, res) {
 
 function scheduleNextRun() {
   setTimeout(async () => {
-    console.log(`Relaunching codespace check...`);
+    console.log('Relaunching codespace check...');
     try {
+      // Use a mock req and res for testing
       await handleRequest({}, { status: () => ({ send: console.log }) });
     } catch (e) {
       console.error('Error during scheduled run:', e.message);
