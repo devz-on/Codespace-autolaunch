@@ -1,0 +1,8 @@
+{
+  "name": "my-vercel-project",
+  "version": "1.0.0",
+  "main": "api/launchCodespace.js",
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  }
+}
