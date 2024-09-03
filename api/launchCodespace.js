@@ -1,65 +1,66 @@
-const fetch = require('node-fetch');
+const axios = require('axios');
 
 const GITHUB_API_URL = 'https://api.github.com';
-const ACCESS_TOKEN = process.env.GITHUB_ACCESS_TOKEN; // GitHub access token stored as an environment variable in Vercel
 const RECHECK_INTERVAL = 230 * 60 * 1000; // 230 minutes in milliseconds
 
 // Function to get the list of codespaces
-async function getCodespace() {
-  const response = await fetch(`${GITHUB_API_URL}/user/codespaces`, {
-    method: 'GET',
+async function getCodespace(githubToken) {
+  const response = await axios.get(`${GITHUB_API_URL}/user/codespaces`, {
     headers: {
-      Authorization: `Bearer ${ACCESS_TOKEN}`,
-      Accept: 'application/vnd.github.v3+json',
+      Authorization: `Bearer ${githubToken}`,
+      Accept: 'application/vnd.github+json',
     },
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch codespaces: ${response.statusText}`);
+  if (response.status !== 200) {
+    throw new Error(`GitHub API returned status code ${response.status}`);
   }
 
-  const data = await response.json();
-  return data.codespaces ? data.codespaces[0] : null; // Returns the first available codespace
+  return response.data.codespaces ? response.data.codespaces[0] : null; // Returns the first available codespace
 }
 
 // Function to stop a running codespace
-async function stopCodespace(codespaceName) {
-  const response = await fetch(`${GITHUB_API_URL}/user/codespaces/${codespaceName}/stop`, {
-    method: 'POST',
+async function stopCodespace(githubToken, codespaceName) {
+  const response = await axios.post(`${GITHUB_API_URL}/user/codespaces/${codespaceName}/stop`, {}, {
     headers: {
-      Authorization: `Bearer ${ACCESS_TOKEN}`,
-      Accept: 'application/vnd.github.v3+json',
+      Authorization: `Bearer ${githubToken}`,
+      Accept: 'application/vnd.github+json',
     },
   });
 
-  if (!response.ok) {
+  if (response.status !== 202) {
     throw new Error(`Failed to stop codespace: ${response.statusText}`);
   }
 
-  return await response.json();
+  return response.data;
 }
 
 // Function to start a codespace
-async function startCodespace(codespaceName) {
-  const response = await fetch(`${GITHUB_API_URL}/user/codespaces/${codespaceName}/start`, {
-    method: 'POST',
+async function startCodespace(githubToken, codespaceName) {
+  const response = await axios.post(`${GITHUB_API_URL}/user/codespaces/${codespaceName}/start`, {}, {
     headers: {
-      Authorization: `Bearer ${ACCESS_TOKEN}`,
-      Accept: 'application/vnd.github.v3+json',
+      Authorization: `Bearer ${githubToken}`,
+      Accept: 'application/vnd.github+json',
     },
   });
 
-  if (!response.ok) {
+  if (response.status !== 202) {
     throw new Error(`Failed to start codespace: ${response.statusText}`);
   }
 
-  return await response.json();
+  return response.data;
 }
 
 // Function to handle the request and manage the codespace
 async function handleRequest(req, res) {
   try {
-    const codespace = await getCodespace();
+    const githubToken = process.env.GITHUB_TOKEN;
+
+    if (!githubToken) {
+      throw new Error('GitHub access token is not set');
+    }
+
+    const codespace = await getCodespace(githubToken);
 
     if (codespace) {
       console.log(`Found codespace: ${codespace.name} with status: ${codespace.state}`);
@@ -67,13 +68,13 @@ async function handleRequest(req, res) {
       // Check if the codespace is running
       if (codespace.state === 'Running') {
         console.log(`Stopping codespace: ${codespace.name}`);
-        await stopCodespace(codespace.name); // Stop the running codespace
+        await stopCodespace(githubToken, codespace.name); // Stop the running codespace
         console.log(`Codespace ${codespace.name} stopped successfully.`);
       }
 
       // Start the codespace
       console.log(`Starting codespace: ${codespace.name}`);
-      await startCodespace(codespace.name);
+      await startCodespace(githubToken, codespace.name);
       console.log(`Codespace ${codespace.name} started successfully.`);
     } else {
       console.log('No codespace found.');
@@ -82,7 +83,7 @@ async function handleRequest(req, res) {
     // Respond with a success message
     res.status(200).send('The project is working fine');
   } catch (error) {
-    console.error(error);
+    console.error(error.message);
 
     // Respond with the error message
     res.status(500).send(`Error: ${error.message}`);
