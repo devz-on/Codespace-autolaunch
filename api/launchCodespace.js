@@ -79,9 +79,12 @@ async function handleRequest(req, res) {
       console.log('No codespace found.');
     }
 
-    res.status(200).send('Process completed. Relaunch scheduled.');
+    // Respond with a success message
+    res.status(200).send('The project is working fine');
   } catch (error) {
     console.error(error);
+
+    // Respond with the error message
     res.status(500).send(`Error: ${error.message}`);
   }
 }
@@ -90,13 +93,17 @@ async function handleRequest(req, res) {
 function scheduleNextRun() {
   setTimeout(async () => {
     console.log(`Relaunching codespace check...`);
-    await handleRequest(); // Trigger the function again
+    try {
+      await handleRequest({}, { status: () => ({ send: console.log }) }); // Run the function and log output for debugging
+    } catch (e) {
+      console.error('Error during scheduled run:', e.message);
+    }
     scheduleNextRun(); // Re-schedule after completion
   }, RECHECK_INTERVAL);
 }
 
 // Entry point for the serverless function
 module.exports = async (req, res) => {
-  await handleRequest(req, res); // Run the function once
+  await handleRequest(req, res); // Run the function once and respond to the user
   scheduleNextRun(); // Start the scheduling loop
 };
